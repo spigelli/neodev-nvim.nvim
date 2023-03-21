@@ -1,0 +1,220 @@
+#!/bin/bash
+
+XDG_CONFIG_HOME="/home/spigelli/.config"
+
+#######################################
+# Check if neovim is installed and if the build is
+# v0.9.0-dev-1248+g204a8b17c or newer
+# Globals: None
+# Arguments: None
+# Outputs: None
+# Returns:
+#  0 if neovim is installed and the version is acceptable
+#  1 if neovim is not installed or the build is old
+#######################################
+function check_neovim_version() {
+  if ! command -v nvim &>/dev/null; then
+    return 1
+  fi
+  local nvim_version
+  nvim_version=$(nvim --version | head -n 1 | cut -d ' ' -f 2)
+  if [[ "$nvim_version" < "v0.9.0-dev-1248+g204a8b17c" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+#######################################
+# Get the directory that this source file is in
+# Globals: None
+# Arguments: None
+# Outputs: The path to this source file
+# Returns:
+#  0 if the path was retrieved successfully
+#  1 if the path was not retrieved successfully
+#######################################
+function get_source_dir() {
+  local source=${BASH_SOURCE[0]}
+  local dir=""
+  # Resolve $source until the file is no longer a symlink
+  while [ -L "$source" ]; do 
+    local target=$(readlink "$source")
+    if [[ $target == /* ]]; then
+      source=$target
+    else
+      dir=$( dirname "$source" )
+      # If $source was a relative symlink, we need to
+      # resolve it relative to the path where the symlink
+      # file was located
+      source=$dir/$target 
+    fi
+  done
+  dir=$( cd -P "$( dirname "$source" )" >/dev/null 2>&1 && pwd )
+  # Test that the directory exists
+  if [[ ! -d "$dir" ]]; then
+    return 1
+  fi
+  echo $dir
+  return 0
+}
+
+#######################################
+# Creates a symbolic link in $XDG_CONFIG_HOME/${NAME} to the
+# configuration files in the current directory
+# Globals: None
+# Arguments:
+#   $1 - The target directory
+#   $2 - The directory to contain a link to the target
+# Outputs: None
+# Returns:
+#  0 if the symbolic links were created successfully
+#  1 if the symbolic links were not created successfully
+#######################################
+function create_symlink() {
+  local target=$1
+  local directory=$2
+  # Test that the directory exists
+  if [[ ! -d "$target" ]]; then
+    echo "The target directory $target does not exist"
+    return 1
+  fi
+  # Test that the directory exists
+  if [[ ! -d "$directory" ]]; then
+  echo "The directory $directory does not exist"
+    return 1
+  fi
+  # Create the symbolic link
+  ln -sfn "$target" "$directory"
+  return $?
+}
+
+#######################################
+# Check if the given location is available for a link
+# Globals: None
+# Arguments:
+#   $1 - The desired directory to contain a link to the target
+# Outputs: None
+# Returns:
+#  0 if there is no existing directory, link, or file
+#  1 if there is an existing directory, link, or file
+#######################################
+function open_for_link() {
+  local link_to=$1
+  if [[ -d "$link_to" ]]; then
+    return 1
+  fi
+  if [[ -L "$link_to" ]]; then
+    return 1
+  fi
+  if [[ -f "$link_to" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+#######################################
+# Check if the given location is linked properly to the
+# link from location
+# Globals: None
+# Arguments:
+#   $1 - The target
+#   $2 - The directory that should contain a link to the target
+# Outputs: None
+# Returns:
+#  0 if the link is correct
+#  1 if the link is not correct
+#######################################
+function is_linked() {
+  local target=$1
+  local directory=$2
+  local correct_link_path="$directory/$(basename "$target")"
+  # Check that correct_link_path is a link to target
+  if [[ ! -L "$correct_link_path" ]]; then
+    return 1
+  fi
+  if [[ "$(readlink "$correct_link_path")" != "$target" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+#######################################
+# Checks if the neovim configuration is linked properly,
+# and if not, links it
+# Globals: XDG_CONFIG_HOME
+# Arguments: None
+# Outputs: An error message if the link does not exist and
+#          cannot be created
+# Returns:
+#  0 if the link is correct
+#  1 if the link is not correct
+#######################################
+function link_neovim() {
+  local target
+  target="$(get_source_dir)"
+  if [[ $? -ne 0 ]]; then
+    echo "Could not get the source directory"
+    return 1
+  fi
+  local link_to="$XDG_CONFIG_HOME"
+  if ! open_for_link "$link_to/$(basename target)"; then
+    if ! is_linked "$target" "$link_to"; then
+      echo "The link $link_to is not linked to $target"
+      return 1
+    fi
+  else
+    if ! create_symlink "$target" "$link_to"; then
+      echo "Could not create the link $link_to to $target"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+#######################################
+# Runs neovim:
+#  - Errors if neovim is not installed or the build is old
+#  - Links the neovim configuration if it is not linked
+#  - Runs neovim with the given arguments as well as 
+#    NVIM_APPNAME set to the basename of this directory
+# Globals: XDG_CONFIG_HOME
+# Arguments:
+#   $@ - The arguments to pass to neovim
+# Outputs: An error message if neovim is not installed or
+#          the build is old or if the link does not exist
+#          and cannot be created
+# Returns:
+#  0 if neovim is installed and the build is new enough
+#    and the link is correct and neovim is run
+#  1 if neovim is not installed or the build is old or
+#    the link is not correct
+#######################################
+function run_neovim() {
+  if ! check_neovim_version; then
+    echo "Neovim is not installed or the build is old"
+    return 1
+  fi
+  if ! link_neovim; then
+    echo "Could not link neovim"
+    return 1
+  fi
+  local nvim_appname
+  nvim_appname="$(basename "$(get_source_dir)")"
+  if [[ $? -ne 0 ]]; then
+    echo "Could not get the source directory"
+    return 1
+  fi
+
+  # XDG_DATA_HOME=$(get_source_dir)/internal/data \
+  # XDG_STATE_HOME=$(get_source_dir)/internal/state \
+  NVIM_APPNAME="$nvim_appname" \
+  nvim "$@"
+  return $?
+}
+
+run_neovim "$@"
+
+# Paths:
+# cache: ~/.cache/neodev-nvim
+# config: ~/.config/neodev-nvim
+# data: ~/.local/share/neodev-nvim
