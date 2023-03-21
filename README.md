@@ -1,34 +1,32 @@
 neodev-nvim 🚀
 ==============
+> Shamelessly pulling from other peoples plugins and toting as some sort of contribution
+[seriously click here before reading futher](https://github.com/folke/neodev.nvim)
 
 neodev-nvim is a quick and easy way to set up a new neovim configuration for Lua editing and plugin development. It includes a preconfigured set of plugins that provide features such as full signature help, docs, and completion for the nvim Lua API, as well as tree-sitter for syntax highlighting and nvim-cmp for completion.
 
 Table of Contents
 -----------------
 
-*   [Installation](#installation)
+*   [Installation](#usage)
 *   [Plugins](#plugins)
 *   [Usage](#usage)
 *   [Contributing](#contributing)
 *   [License](#license)
 
-Installation 🛠️
+Usage 🛠️
 ----------------
 
-To install neodev-nvim, simply clone this repository to your local machine:
+To begin the long and arduous installation process, start by running this command
 
+#### 1.
 ```bash
-git clone https://github.com/yourusername/neodev-nvim.git
+git clone https://github.com/yourusername/neodev-nvim.git && ./neodev-nvim/neodev ~/.config/nvim/init.lua
 ```
 
-Once you have cloned the repository, run the setup.sh script to symlink the configuration files into the correct directory and add them to your path:
+> Note that neodev-nvim requires the nightly version of neovim in order to work properly, as it makes use of the NVIM\_APPNAME environment variable to specify the base directory for XDG\_HOME, XDG\_STATE, and XDG\_SHARE.
 
-```bash
-cd neodev-nvim
-./setup.sh
-```
-
-Note that neodev-nvim requires the nightly version of neovim in order to work properly, as it makes use of the NVIM\_APPNAME environment variable to specify the base directory for XDG\_HOME, XDG\_STATE, and XDG\_SHARE.
+thats it
 
 Plugins 🧩
 ----------
