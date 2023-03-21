@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#######################################
+# Get the directory that this source file is in
+# Globals: None
+# Arguments: None
+# Outputs: The path to this source file
+# Returns:
+#  0 if the path was retrieved successfully
+#  1 if the path was not retrieved successfully
+#######################################
+function get_source_dir() {
+  local source=${BASH_SOURCE[0]}
+  local dir=""
+  # Resolve $source until the file is no longer a symlink
+  while [ -L "$source" ]; do 
+    local target=$(readlink "$source")
+    if [[ $target == /* ]]; then
+      source=$target
+    else
+      dir=$( dirname "$source" )
+      # If $source was a relative symlink, we need to
+      # resolve it relative to the path where the symlink
+      # file was located
+      source=$dir/$target 
+    fi
+  done
+  dir=$( cd -P "$( dirname "$source" )" >/dev/null 2>&1 && pwd )
+  # Test that the directory exists
+  if [[ ! -d "$dir" ]]; then
+    return 1
+  fi
+  echo $dir
+  return 0
+}
+
+function add_to_path() {
+  local line="export PATH=\"$(get_source_dir):\$PATH\""
+  # IF $HOME/.bashrc exists...
+  
+  local found_config=false
+  for shell in bash zsh ksh; do
+    local shellrc="$HOME/.$(echo "$shell")rc"
+    # echo "Checking $shellrc"
+    if [[ -f "$shellrc" ]]; then
+      found_config=true
+      # ...and the line is not already in the file...
+      if ! grep -q "$line" "$shellrc"; then
+        # ...then add the line to the file
+        echo "$line" >> "$shellrc"
+        echo -e "\e[32mAdded \"$line\" to $shellrc\e[0m"
+        source "$shellrc"
+        echo -e "\e[32mSourced $shellrc\e[0m"
+      else
+        # Log in red that the line is already in the file
+        echo -e "\e[31mThe line \"$line\" is already in $shellrc\e[0m"
+      fi
+    fi
+  done
+  if [[ $found_config == false ]]; then
+    echo "Could not find a shell configuration file"
+    return 1
+  fi
+
+}
+
+add_to_path
